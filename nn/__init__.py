@@ -1,0 +1,1 @@
+"""Neural network library built from scratch using NumPy."""
