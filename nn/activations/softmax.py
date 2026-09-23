@@ -9,7 +9,8 @@ class Softmax(Module):
     """Softmax activation function.
 
     Computes stable row-wise softmax: softmax(x_i) = exp(x_i) / sum(exp(x_j))
-    Uses max-shift technique for numerical stability.
+    over the last axis. Uses the max-shift technique for numerical stability
+    and a vectorized Jacobian-vector product for the backward pass.
     """
 
     def __init__(self):
@@ -31,19 +32,20 @@ class Softmax(Module):
         return self._output
 
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
-        """Compute softmax backward pass using Jacobian-vector product.
+        """Compute softmax backward pass using the Jacobian-vector product.
+
+        Each row's Jacobian is ``diag(a) - a a^T``; applying it to the
+        upstream gradient ``g`` and simplifying gives the vectorized
+        closed form ``a * (g - sum(g * a))`` used here, so one matrix
+        expression handles the whole batch with no per-example loop.
 
         Args:
-            grad_output: Upstream gradient of shape (m, C).
+            grad_output: Upstream gradient of shape (m, C), not mutated.
 
         Returns:
-            Gradient w.r.t. input, shape (m, C).
+            Gradient w.r.t. the logits, shape (m, C), where row i is
+            ``a_i * (g_i - <g_i, a_i>)``.
         """
-        m, C = grad_output.shape
-        grad_input = np.zeros_like(grad_output)
-        for i in range(m):
-            a = self._output[i]
-            g = grad_output[i]
-            jac = np.diag(a) - np.outer(a, a)
-            grad_input[i] = jac @ g
-        return grad_input
+        a = self._output
+        dot = np.sum(grad_output * a, axis=1, keepdims=True)
+        return a * (grad_output - dot)

@@ -28,11 +28,15 @@ class Sigmoid(Module):
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
         """Compute sigmoid backward pass.
 
+        Uses the stored output ``a`` from the last forward call: the local
+        derivative is ``a * (1 - a)``, so the input gradient is
+        ``grad_output * a * (1 - a)``.
+
         Args:
             grad_output: Upstream gradient of same shape as forward input.
 
         Returns:
-            Gradient w.r.t. input, same shape.
+            Gradient w.r.t. the input, same shape as grad_output.
         """
         a = self._output
         return grad_output * a * (1.0 - a)

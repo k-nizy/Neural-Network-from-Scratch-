@@ -53,11 +53,11 @@ main.py                           training loop on the AND dataset (Ch 10)
   Sigmoid clips its input to ±500 before `exp`. Both losses clip predictions
   to `[1e-15, 1 - 1e-15]` before `log`/division, so a confident wrong
   prediction produces a huge-but-finite loss instead of `nan`.
-- **Softmax backward** builds the Jacobian `diag(a) - a aᵀ` per row and
-  applies it to the upstream gradient — an explicit per-example loop, which
-  the assignment allows for this stage. The equivalent vectorized JVP form is
-  `a * (g - (a·g).sum())`, verified to agree with the loop to machine
-  precision.
+- **Softmax backward** applies the row Jacobian `diag(a) − a aᵀ` to the
+  upstream gradient in the simplified vectorized form `a ∘ (g − (a·g) 1)` —
+  one broadcasted expression for the whole batch, no per-example loop (the
+  loop form the assignment allows was used first and then verified against
+  this closed form to machine precision).
 - **SGD in-place contract:** `step()` does `param -= lr * grad` (rebinding a
   new array would desynchronize the optimizer from the layer's weights) and
   `zero_grad()` fills stored gradient arrays with 0. The optimizer holds

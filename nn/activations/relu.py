@@ -27,10 +27,15 @@ class ReLU(Module):
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
         """Compute ReLU backward pass.
 
+        Multiplies the upstream gradient by the mask stored during
+        ``forward``: gradients pass through where the input was > 0 and
+        are blocked (set to 0) where it was <= 0, so x = 0 gets zero
+        gradient by convention.
+
         Args:
             grad_output: Upstream gradient of same shape as forward input.
 
         Returns:
-            Gradient w.r.t. input, same shape.
+            Gradient w.r.t. the input, same shape, 0 where input <= 0.
         """
         return grad_output * self._mask
