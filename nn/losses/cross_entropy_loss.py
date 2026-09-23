@@ -15,14 +15,15 @@ class CrossEntropyLoss:
         self._targets = None
 
     def forward(self, predictions: np.ndarray, targets: np.ndarray) -> float:
-        """Compute binary cross-entropy loss.
+        """Compute binary cross-entropy loss, averaged over all elements.
 
         Args:
             predictions: Predicted probabilities, shape (m, 1) or (m,).
-            targets: Ground truth labels (0 or 1), shape (m, 1) or (m,).
+            targets: Ground truth labels (0 or 1), same shape as predictions.
 
         Returns:
-            Scalar loss value (Python float).
+            Scalar loss value (Python float), the mean of the per-element
+            BCE terms.
         """
         self._predictions = predictions
         self._targets = targets
@@ -35,13 +36,17 @@ class CrossEntropyLoss:
     def backward(self) -> np.ndarray:
         """Compute gradient w.r.t. predictions.
 
+        Dividing by predictions.size (not shape[0]) keeps this the exact
+        gradient of forward() for any input shape, including (m, C); for the
+        documented (m, 1) / (m,) shapes size equals the batch size m.
+
         Returns:
-            Gradient of shape (m, 1) or (m,).
+            Gradient of the same shape as predictions.
         """
         a = self._predictions
         y = self._targets
-        m = a.shape[0]
+        n = a.size
         eps = 1e-15
         a_clipped = np.clip(a, eps, 1.0 - eps)
-        grad = -(y / a_clipped - (1.0 - y) / (1.0 - a_clipped)) / m
+        grad = -(y / a_clipped - (1.0 - y) / (1.0 - a_clipped)) / n
         return grad
