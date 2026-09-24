@@ -57,9 +57,10 @@ Jacobian to ~1e-16).
 
 ## Use of AI tooling
 
-An AI coding assistant was used for debugging, lint cleanup, and explaining
-course material — never as the author of the implementation. All design
-decisions above were reviewed and understood by the author.
+An AI coding assistant was used as a helper for debugging, lint cleanup,
+and explaining course material, per the course policy on AI use. The
+implementation decisions and submitted code were reviewed and understood
+by the author.
 
 ## References
 

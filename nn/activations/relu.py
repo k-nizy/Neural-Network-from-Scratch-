@@ -1,4 +1,4 @@
-"""ReLU activation implementation."""
+"""ReLU activation."""
 
 import numpy as np
 
@@ -6,36 +6,31 @@ from nn.module import Module
 
 
 class ReLU(Module):
-    """ReLU activation function: f(x) = max(0, x)."""
+    """ReLU activation: f(x) = max(0, x)."""
 
     def __init__(self):
-        """Initialize ReLU activation."""
+        """Set up the stored mask."""
         self._mask = None
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Compute ReLU forward pass.
+        """Compute max(0, x) elementwise.
 
         Args:
             x: Input array of any shape.
 
         Returns:
-            Output array of same shape with negative values zeroed.
+            Same shape, negatives zeroed.
         """
         self._mask = x > 0
         return np.maximum(x, 0)
 
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
-        """Compute ReLU backward pass.
-
-        Multiplies the upstream gradient by the mask stored during
-        ``forward``: gradients pass through where the input was > 0 and
-        are blocked (set to 0) where it was <= 0, so x = 0 gets zero
-        gradient by convention.
+        """Pass gradients where x > 0, block them where x <= 0.
 
         Args:
-            grad_output: Upstream gradient of same shape as forward input.
+            grad_output: Upstream gradient, same shape as the input.
 
         Returns:
-            Gradient w.r.t. the input, same shape, 0 where input <= 0.
+            Same shape; 0 where the input was <= 0 (so x = 0 gets 0).
         """
         return grad_output * self._mask

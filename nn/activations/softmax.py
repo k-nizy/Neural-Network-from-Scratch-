@@ -1,4 +1,4 @@
-"""Softmax activation implementation."""
+"""Softmax activation."""
 
 import numpy as np
 
@@ -6,25 +6,25 @@ from nn.module import Module
 
 
 class Softmax(Module):
-    """Softmax activation function.
+    """Row-wise softmax over the last axis.
 
-    Computes stable row-wise softmax: softmax(x_i) = exp(x_i) / sum(exp(x_j))
-    over the last axis. Uses the max-shift technique for numerical stability
-    and a vectorized Jacobian-vector product for the backward pass.
+    Shifts each row by its max before exponentiating so large logits
+    stay finite, and computes the backward pass with the vectorized
+    Jacobian-vector product.
     """
 
     def __init__(self):
-        """Initialize Softmax activation."""
+        """Set up the stored output."""
         self._output = None
 
     def forward(self, x: np.ndarray) -> np.ndarray:
-        """Compute stable row-wise softmax forward pass.
+        """Compute row-wise softmax probabilities.
 
         Args:
-            x: Input array of shape (m, C) where m is batch size, C is classes.
+            x: Logits of shape (m, C), m = batch size.
 
         Returns:
-            Output array of shape (m, C) with row-wise probabilities summing to 1.
+            Probabilities of shape (m, C); each row sums to 1.
         """
         shifted = x - np.max(x, axis=1, keepdims=True)
         exp_shifted = np.exp(shifted)
@@ -32,19 +32,16 @@ class Softmax(Module):
         return self._output
 
     def backward(self, grad_output: np.ndarray) -> np.ndarray:
-        """Compute softmax backward pass using the Jacobian-vector product.
+        """Apply each row's softmax Jacobian to the upstream gradient.
 
-        Each row's Jacobian is ``diag(a) - a a^T``; applying it to the
-        upstream gradient ``g`` and simplifying gives the vectorized
-        closed form ``a * (g - sum(g * a))`` used here, so one matrix
-        expression handles the whole batch with no per-example loop.
+        Row i of the Jacobian is diag(a) - a a^T; applying it to g and
+        simplifying gives a * (g - sum(g * a)), done for all rows at once.
 
         Args:
             grad_output: Upstream gradient of shape (m, C), not mutated.
 
         Returns:
-            Gradient w.r.t. the logits, shape (m, C), where row i is
-            ``a_i * (g_i - <g_i, a_i>)``.
+            Gradient w.r.t. the logits, shape (m, C).
         """
         a = self._output
         dot = np.sum(grad_output * a, axis=1, keepdims=True)

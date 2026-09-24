@@ -1,54 +1,45 @@
-"""Base class defining the shared interface for every layer, activation, and loss."""
-
+"""Module base class shared by all layers and activations."""
 
 class Module:
-    """Base class every layer and activation subclasses.
+    """Base class for layers and activations.
 
-    Defines the forward/backward contract, plus default
-    (empty) parameter and gradient-reset behavior for
-    modules that have no learnable weights.
+    Defines the forward/backward contract. Modules with no learnable
+    weights just use the defaults below.
     """
 
     def forward(self, x):
-        """Compute this module's output given input x.
+        """Compute the output from input x.
 
         Args:
             x: input array.
 
         Returns:
-            The module's output for this input.
+            The module's output.
         """
         raise NotImplementedError
 
     def backward(self, grad_output):
-        """Compute gradients given the upstream gradient.
+        """Propagate the upstream gradient to the input.
 
         Args:
-            grad_output: gradient of the loss with respect
-            to this module's output.
+            grad_output: gradient of the loss w.r.t. this module's output.
 
         Returns:
-            Gradient of the loss with respect to this
-            module's input.
+            Gradient of the loss w.r.t. this module's input.
         """
         raise NotImplementedError
 
     def parameters(self):
-        """Return this module's learnable parameters.
+        """Return learnable parameters as [(param, grad), ...].
 
-        Returns:
-            A list of (param, grad) pairs. Empty for
-            modules with no learnable weights.
+        Empty by default for modules without weights.
         """
         return []
 
     def zero_grad(self):
-        """Reset any stored gradients to zero.
+        """Reset stored gradients.
 
-        No-op by default. In this project, resetting stored
-        gradients is handled by the optimizer (Chapter 9)
-        directly, not by individual modules -- you will not
-        need to override this method anywhere, including in
-        Linear.
+        Not used in this project: the optimizer clears gradients
+        directly (Chapter 9), so modules don't need to override this.
         """
         pass

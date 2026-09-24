@@ -1,10 +1,4 @@
-"""Main training script: a single linear neuron trained on the AND dataset.
-
-Wires together the pieces built in Chapters 1-9 -- a Linear layer, a Sigmoid
-activation, a binary cross-entropy loss, and an SGD optimizer -- into one
-full-batch training loop (Chapter 10), then reports the final loss and
-classification accuracy when run as a script.
-"""
+"""Train a single linear neuron on the AND gate (Chapter 10)."""
 
 import numpy as np
 
@@ -13,9 +7,7 @@ from nn.layers import Linear
 from nn.losses import CrossEntropyLoss
 from nn.optim import SGD
 
-# State shared between train() and accuracy(): the trained model and the
-# data it was trained on. accuracy() can be called without a prior explicit
-# train() call, in which case it trains with the default settings first.
+# Shared state so accuracy() works even without an explicit train() call.
 _X = None
 _Y = None
 _linear = None
@@ -23,14 +15,14 @@ _sigmoid = None
 
 
 def toy_data():
-    """Return the 4-sample AND-gate toy dataset.
+    """Return the 4-sample AND-gate dataset.
 
-    The AND gate is the standard single-neuron sanity check: it is linearly
-    separable, so a single Linear + Sigmoid can fit it exactly (XOR cannot).
+    AND is linearly separable, so one Linear + Sigmoid can fit it
+    (XOR cannot).
 
     Returns:
-        X: Input features of shape (4, 2); each row holds two input bits.
-        y: Binary labels of shape (4, 1); y = x1 AND x2 for each row.
+        X: Inputs of shape (4, 2).
+        y: Labels of shape (4, 1), y = x1 AND x2 for each row.
     """
     X = np.array([
         [0.0, 0.0],
@@ -48,20 +40,18 @@ def toy_data():
 
 
 def train(epochs=4000, lr=1.0, seed=0):
-    """Train Linear -> Sigmoid with binary cross-entropy on the AND dataset.
+    """Train Linear -> Sigmoid with binary cross-entropy on the AND data.
 
-    Full-batch gradient descent: every epoch computes the loss and gradients
-    over all 4 samples, then the optimizer applies one update and clears the
-    gradients for the next epoch.
+    Full-batch gradient descent: each epoch runs forward, loss, backward,
+    one optimizer step, then clears the gradients.
 
     Args:
-        epochs: Number of full-batch gradient-descent steps.
-        lr: Learning rate passed to the SGD optimizer.
-        seed: Seed for NumPy's global RNG, making the weight initialization
-            reproducible.
+        epochs: Number of gradient-descent steps.
+        lr: Learning rate for SGD.
+        seed: Seed for NumPy's global RNG, so the run is reproducible.
 
     Returns:
-        List of Python floats: the loss recorded at every epoch, in order.
+        List of Python floats, the loss at every epoch.
     """
     global _X, _Y, _linear, _sigmoid
 
@@ -92,18 +82,16 @@ def train(epochs=4000, lr=1.0, seed=0):
 
 
 def accuracy(loss_history=None):
-    """Compute classification accuracy of the trained model on the AND data.
-
-    Predictions are thresholded at 0.5 and compared against the labels.
+    """Accuracy of the trained model on the AND data, thresholded at 0.5.
 
     Args:
-        loss_history: Optional loss history as returned by train(); accepted
-            for interface compatibility and not needed to score predictions.
+        loss_history: Optional loss history from train(); accepted for
+            interface compatibility, not needed to score predictions.
 
     Returns:
-        Accuracy as a Python float between 0.0 and 1.0.
+        Accuracy as a Python float in [0.0, 1.0].
     """
-    del loss_history  # not needed to score predictions
+    del loss_history
     if _linear is None or _X is None:
         train()
 
