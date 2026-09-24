@@ -1,103 +1,70 @@
-# Formative 1, Part 1 — A Neural Network from Scratch in NumPy
+# Formative 1, Part 1 — Neural Network from Scratch (NumPy only)
 
-A minimal autograd-style neural network library built with NumPy only — no
-deep-learning framework anywhere in the project — plus a training script that
-fits a single linear neuron to the AND gate.
+A small neural-network library built with NumPy only — no deep-learning
+framework — plus `main.py`, which trains a single linear neuron on the AND
+gate with binary cross-entropy and SGD.
 
 ## Structure
 
 ```
 nn/
-  module.py                       Module: the forward/backward contract (Ch 0.5)
-  layers/linear.py                Linear: Y = X @ W + b, Xavier init (Ch 1-3)
-  activations/relu.py             ReLU + mask backward (Ch 4)
-  activations/sigmoid.py          Sigmoid + clipped stable forward (Ch 5)
-  activations/softmax.py          row-wise softmax, max-shift, JVP backward (Ch 2, 7)
-  losses/cross_entropy_loss.py    binary cross-entropy, not a Module (Ch 6)
-  losses/categorical_cross_entropy_loss.py   categorical cross-entropy (Ch 8)
-  optim/sgd.py                    in-place SGD step + zero_grad (Ch 9)
-main.py                           training loop on the AND dataset (Ch 10)
+  module.py                                    Module: forward/backward contract
+  layers/linear.py                             Linear: Y = X @ W + b, Xavier init
+  activations/relu.py                          ReLU + mask backward
+  activations/sigmoid.py                       Sigmoid, clipped stable forward
+  activations/softmax.py                       row-wise softmax, vectorized JVP backward
+  losses/cross_entropy_loss.py                 binary cross-entropy (not a Module)
+  losses/categorical_cross_entropy_loss.py     categorical cross-entropy (not a Module)
+  optim/sgd.py                                 in-place SGD step + zero_grad
+main.py                                        toy_data, train, accuracy (AND gate)
 ```
 
-## Conventions that everything else depends on
+## How to run
 
-- **Shapes.** Input `X` is `(m, n)`; weights `W` are `(n, C)` (inputs by
-  outputs); `b` is `(C,)` and broadcasts across the batch; outputs are
-  `(m, C)`. A single output neuron is just `C = 1`, so `Linear(2, 1)` returns
-  `(m, 1)` arrays — never a bare float.
-- **Who stores what.** Layers/activations cache forward values (`_x`, `_mask`,
-  `_output`) during `forward` so `backward` can reuse them. Losses store
-  `(predictions, targets)` instead — they see the graph from the top.
-- **Who is not a Module.** Losses and the optimizer are plain classes on
-  purpose: they don't have a forward/backward position in the same sense.
-  A loss's `backward()` takes no `grad_output` because it is the top of the
-  graph; the SGD optimizer only reads `(param, grad)` pairs and mutates them
-  in place.
-- **Sum vs mean.** `Linear.backward` **sums** gradients over the batch
-  (`dW = Xᵀ @ G`, `db = G.sum(axis=0)`) because each example contributes its
-  own gradient; losses **average** (`/ m`) so the loss magnitude doesn't grow
-  with batch size. Getting these two backwards trains silently wrong.
-- **Binary vs categorical.** BCE divides by the number of *elements*
-  (`predictions.size`), keeping `backward` the exact gradient of `forward`
-  for both `(m,)` and `(m, 1)` inputs; CCE divides by batch size `m` over
-  `(m, C)` one-hot targets, which makes Softmax + CCE reduce to the classic
-  `(a - y) / m` shortcut.
+```bash
+pytest                 # public stage checks (provided tests/)
+ruff check nn/ main.py # lint + docstring checks
+python main.py         # trains AND: loss -> ~0.004, accuracy 1.0000
+```
 
-## Design decisions worth defending
+## Key decisions
 
-- **Xavier/Glorot uniform init:** `W ~ Uniform(±sqrt(6 / (in + out)))`, the
-  shape-aware bound that keeps activation variance roughly constant across
-  layers. A zeros or `randn * 0.01` init would fail the shape-aware check.
-- **Numerical stability:** Softmax shifts logits by the row max before
-  exponentiating, so `exp` never overflows even for logits like ±1e9.
-  Sigmoid clips its input to ±500 before `exp`. Both losses clip predictions
-  to `[1e-15, 1 - 1e-15]` before `log`/division, so a confident wrong
-  prediction produces a huge-but-finite loss instead of `nan`.
-- **Softmax backward** applies the row Jacobian `diag(a) − a aᵀ` to the
-  upstream gradient in the simplified vectorized form `a ∘ (g − (a·g) 1)` —
-  one broadcasted expression for the whole batch, no per-example loop (the
-  loop form the assignment allows was used first and then verified against
-  this closed form to machine precision).
-- **SGD in-place contract:** `step()` does `param -= lr * grad` (rebinding a
-  new array would desynchronize the optimizer from the layer's weights) and
-  `zero_grad()` fills stored gradient arrays with 0. The optimizer holds
-  references to the *same* arrays `Linear.parameters()` returned.
+- **Shapes:** inputs `(m, n)`, weights `(n, C)`, bias `(C,)`, outputs `(m, C)`;
+  a single output neuron is `C = 1`, so outputs stay `(m, 1)`.
+- **Init:** Xavier/Glorot uniform, `W ~ U(±sqrt(6 / (in + out)))` — shape-aware,
+  bias starts at zeros.
+- **Gradients:** `Linear.backward` **sums** over the batch (`dW = XᵀG`,
+  `db = G.sum(axis=0)`, `dX = GWᵀ`); losses **average** (`/ m`), so
+  `Sigmoid + BCE` and `Softmax + CCE` both reduce to the classic
+  `(a − y) / m` shortcut. BCE divides by element count so `backward` is the
+  exact gradient of `forward` for `(m,)` and `(m, 1)` shapes alike.
+- **Stability:** softmax shifts logits by the row max (rows of ±1e9 stay
+  finite); sigmoid clips input to ±500; both losses clip predictions to
+  `[1e-15, 1 − 1e-15]` before `log`.
+- **Vectorization:** no data-level loops anywhere in `nn/`; `Softmax.backward`
+  uses the closed-form JVP `a ∘ (g − (a·g) 1)` in one broadcasted expression.
+- **In-place SGD:** `step()` does `param -= lr * grad` on the exact arrays
+  `parameters()` returned; `zero_grad()` fills the stored gradient arrays.
 
 ## Verification
 
-```bash
-pytest               # 62 public checks, stages 1-10
-ruff check nn/ main.py
-python main.py       # trains AND: loss -> ~0.004, accuracy 1.0000
-```
-
-Gradients were additionally validated by central-difference checks against
-the analytic gradients (Linear chains through Sigmoid + BCE, and Softmax +
-CCE), all agreeing to ~1e-10. Convergence was confirmed across seeds
-0, 1, 2, 7, 42 — all reach accuracy 1.0 with finite, decreasing loss.
-
-## What the AND dataset is doing here
-
-The network is a *linear* classifier (one Linear, one activation, nothing in
-between), so it can only learn linearly separable targets. XOR is the
-textbook non-separable example and is impossible for this architecture
-regardless of training; AND is linearly separable, which makes it a genuine
-end-to-end sanity check of the pipeline rather than a test of the wrong
-thing.
+All 62 public checks pass (`pytest`), every stage reports `PASS` with
+`LINT clean`, `ruff check nn/ main.py` exits 0, and training converges to
+accuracy 1.0 across seeds 0/1/2/7/42. Gradients were additionally validated
+by central-difference checks (Linear→Sigmoid→BCE and Softmax→CCE agree with
+finite differences to ~1e-10; the vectorized softmax JVP matches the explicit
+Jacobian to ~1e-16).
 
 ## Use of AI tooling
 
-Development used an AI coding assistant for debugging, lint cleanup, and
-explaining course material; all submitted implementation decisions were
-reviewed and understood by the author. See the course policy on AI use.
+An AI coding assistant was used for debugging, lint cleanup, and explaining
+course material — never as the author of the implementation. All design
+decisions above were reviewed and understood by the author.
 
 ## References
 
-- Course guide: `guide.pdf` (assignment spec, chapters 0.5-10).
+- Course guide: `guide.pdf` (assignment spec, chapters 0.5–10).
 - X. Glorot and Y. Bengio, "Understanding the difficulty of training deep
-  feedforward neural networks," AISTATS 2010 — the Xavier initialization
-  bound used in `nn/layers/linear.py`.
-- NumPy documentation, https://numpy.org/doc/ — array API semantics
-  (broadcasting, `keepdims`, in-place ufuncs).
-- Ruff (linter) documentation, https://docs.astral.sh/ruff/ — used for the
-  documentation/style checks configured in `pyproject.toml`.
+  feedforward neural networks," AISTATS 2010 (Xavier initialization).
+- NumPy documentation, https://numpy.org/doc/.
+- Ruff documentation, https://docs.astral.sh/ruff/.
